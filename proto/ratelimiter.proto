@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package ratelimiter;
+
+option go_package = "github.com/joshua-sajeev/tollgate/gen";
+
+// CheckLimitRequest is sent by a client to ask whether a request
+// should be allowed against a given key's token bucket.
+message CheckLimitRequest {
+  // UserId identifies who or what is being rate-limited
+  string user_id = 1;
+
+  // Tokens is the cost of this request, in tokens.
+  int32 tokens = 2;
+}
+
+// CheckLimitResponse is returned by the server after checking, and
+// consuming from, the caller's token bucket.
+message CheckLimitResponse {
+  // Allowed reports whether the request is permitted.
+  bool allowed = 1;
+
+  // Remaining is the estimated token balance left after this check.
+  int32 remaining = 2;
+
+  // RetryAfterSeconds is how long the caller should wait before
+  // retrying. Only meaningful when Allowed is false.
+  int32 retry_after_seconds = 3;
+}
+
+// RateLimiter is the gRPC service other backend services call to
+// check whether a request should be allowed or rate-limited.
+service RateLimiter {
+  // CheckLimit evaluates one request against the caller's token
+  // bucket and reports whether it is allowed.
+  rpc CheckLimit(CheckLimitRequest) returns (CheckLimitResponse);
+}
