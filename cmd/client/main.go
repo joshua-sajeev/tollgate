@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"time"
 
@@ -11,8 +12,19 @@ import (
 )
 
 func main() {
+	serverAddr := flag.String("server", "localhost:50051", "gRPC server address")
+	userID := flag.String("user-id", "user:001", "user ID whose token bucket to check")
+	tokens := flag.Int("tokens", 2, "token cost for this request")
+	flag.Parse()
+	if *userID == "" {
+		log.Fatal("-user-id must not be empty")
+	}
+	if *tokens <= 0 || int64(*tokens) > 2147483647 {
+		log.Fatal("-tokens must be between 1 and 2147483647")
+	}
+
 	conn, err := grpc.NewClient(
-		"localhost:50051",
+		*serverAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -30,8 +42,8 @@ func main() {
 	defer cancel()
 
 	r, err := c.CheckLimit(ctx, &pb.CheckLimitRequest{
-		UserId: "user:001",
-		Tokens: 2,
+		UserId: *userID,
+		Tokens: int32(*tokens),
 	})
 	if err != nil {
 		log.Fatalf("could not check limit: %v", err)
