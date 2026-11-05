@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	pb "github.com/joshua-sajeev/tollgate/gen"
 	"github.com/joshua-sajeev/tollgate/internal/config"
@@ -23,22 +24,34 @@ type server struct {
 }
 
 func (s *server) CheckLimit(ctx context.Context, req *pb.CheckLimitRequest) (res *pb.CheckLimitResponse, err error) {
-	if req.GetUserId() == "" {
-		return nil, status.Error(codes.InvalidArgument, "user_id must not be empty")
-	}
-	if req.GetTokens() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "tokens must be positive")
-	}
+	started := time.Now()
+	userID, tokens := req.GetUserId(), req.GetTokens()
+	log.Printf("CheckLimit started: user_id=%q tokens=%d", userID, tokens)
 
-	result, err := s.limiter.Check(ctx, req.GetUserId(), req.GetTokens())
-	if err != nil {
+	if userID == "" {
+		err := status.Error(codes.InvalidArgument, "user_id must not be empty")
+		log.Printf("CheckLimit rejected: user_id=%q tokens=%d error=%v elapsed=%s", userID, tokens, err, time.Since(started))
 		return nil, err
 	}
-	return &pb.CheckLimitResponse{
+	if tokens <= 0 {
+		err := status.Error(codes.InvalidArgument, "tokens must be positive")
+		log.Printf("CheckLimit rejected: user_id=%q tokens=%d error=%v elapsed=%s", userID, tokens, err, time.Since(started))
+		return nil, err
+	}
+
+	result, err := s.limiter.Check(ctx, userID, tokens)
+	if err != nil {
+		log.Printf("CheckLimit failed: user_id=%q tokens=%d error=%v elapsed=%s", userID, tokens, err, time.Since(started))
+		return nil, err
+	}
+	response := &pb.CheckLimitResponse{
 		Allowed:           result.Allowed,
 		Remaining:         result.Remaining,
 		RetryAfterSeconds: result.RetryAfterSeconds,
-	}, nil
+	}
+	log.Printf("CheckLimit completed: user_id=%q tokens=%d allowed=%t remaining=%d retry_after=%ds elapsed=%s",
+		userID, tokens, response.Allowed, response.Remaining, response.RetryAfterSeconds, time.Since(started))
+	return response, nil
 }
 
 func main() {
