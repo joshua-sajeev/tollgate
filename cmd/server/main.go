@@ -13,6 +13,8 @@ import (
 	"github.com/joshua-sajeev/tollgate/internal/limiter"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type server struct {
@@ -21,6 +23,13 @@ type server struct {
 }
 
 func (s *server) CheckLimit(ctx context.Context, req *pb.CheckLimitRequest) (res *pb.CheckLimitResponse, err error) {
+	if req.GetUserId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id must not be empty")
+	}
+	if req.GetTokens() <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "tokens must be positive")
+	}
+
 	result, err := s.limiter.Check(ctx, req.GetUserId(), req.GetTokens())
 	if err != nil {
 		return nil, err
