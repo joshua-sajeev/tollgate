@@ -42,7 +42,16 @@ func (s *server) CheckLimit(ctx context.Context, req *pb.CheckLimitRequest) (res
 	result, err := s.limiter.Check(ctx, userID, tokens)
 	if err != nil {
 		log.Printf("CheckLimit failed: user_id=%q tokens=%d error=%v elapsed=%s", userID, tokens, err, time.Since(started))
-		return nil, err
+		switch {
+		case errors.Is(err, context.DeadlineExceeded):
+			return nil, status.Error(codes.DeadlineExceeded, "request timed out")
+		case errors.Is(err, context.Canceled):
+			return nil, status.Error(codes.Canceled, "request canceled")
+		case errors.Is(err, limiter.ErrInternal):
+			return nil, status.Error(codes.Internal, "internal error")
+		default:
+			return nil, status.Error(codes.Unavailable, "service unavailable")
+		}
 	}
 	response := &pb.CheckLimitResponse{
 		Allowed:           result.Allowed,

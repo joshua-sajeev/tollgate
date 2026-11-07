@@ -4,6 +4,7 @@ package limiter
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -13,6 +14,9 @@ import (
 
 //go:embed limiter.lua
 var script string
+
+// ErrInternal marks unexpected results returned by the limiter script.
+var ErrInternal = errors.New("internal error")
 
 type Limiter struct {
 	redis      *redis.Client
@@ -56,20 +60,20 @@ func (l *Limiter) Check(ctx context.Context, userID string, cost int32) (Result,
 		return Result{}, fmt.Errorf("evaluate rate limit script: %w", err)
 	}
 	if len(values) != 3 {
-		return Result{}, fmt.Errorf("unexpected Lua result length: %d", len(values))
+		return Result{}, fmt.Errorf("%w: unexpected Lua result length: %d", ErrInternal, len(values))
 	}
 
 	allowed, err := asFloat(values[0])
 	if err != nil {
-		return Result{}, fmt.Errorf("parse allowed result: %w", err)
+		return Result{}, fmt.Errorf("%w: parse allowed result: %w", ErrInternal, err)
 	}
 	remaining, err := asFloat(values[1])
 	if err != nil {
-		return Result{}, fmt.Errorf("parse remaining result: %w", err)
+		return Result{}, fmt.Errorf("%w: parse remaining result: %w", ErrInternal, err)
 	}
 	retryAfter, err := asFloat(values[2])
 	if err != nil {
-		return Result{}, fmt.Errorf("parse retry-after result: %w", err)
+		return Result{}, fmt.Errorf("%w: parse retry-after result: %w", ErrInternal, err)
 	}
 
 	return Result{
