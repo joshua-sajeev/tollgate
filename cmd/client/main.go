@@ -17,6 +17,7 @@ func main() {
 	userID := flag.String("user-id", "user:001", "user ID whose token bucket to check")
 	tokens := flag.Int("tokens", 2, "token cost for this request")
 	n := flag.Int("n", 1, "number of concurrent requests to fire")
+	timeout := flag.Duration("timeout", 2*time.Second, "maximum time to wait for each request (for example, 10s or 1m)")
 	flag.Parse()
 
 	provided := make(map[string]bool)
@@ -37,6 +38,9 @@ func main() {
 	if *n <= 0 {
 		log.Fatal("-n must be at least 1")
 	}
+	if *timeout <= 0 {
+		log.Fatal("-timeout must be greater than zero")
+	}
 
 	conn, err := grpc.NewClient(
 		*serverAddr,
@@ -56,7 +60,7 @@ func main() {
 	var wg sync.WaitGroup
 	for i := range *n {
 		wg.Go(func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 			defer cancel()
 
 			r, err := c.CheckLimit(ctx, &pb.CheckLimitRequest{
