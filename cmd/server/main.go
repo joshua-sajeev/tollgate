@@ -18,9 +18,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+type checker interface {
+	Check(ctx context.Context, userID string, cost int32) (limiter.Result, error)
+}
+
 type server struct {
 	pb.UnimplementedRateLimiterServer
-	limiter *limiter.Limiter
+	limiter checker
 }
 
 func (s *server) CheckLimit(ctx context.Context, req *pb.CheckLimitRequest) (res *pb.CheckLimitResponse, err error) {

@@ -409,7 +409,9 @@ func TestCheck_RedisFailure(t *testing.T) {
 		Addr:        "localhost:1",
 		DialTimeout: 50 * time.Millisecond,
 	})
-	defer badClient.Close()
+	defer func() {
+		_ = badClient.Close()
+	}()
 
 	l, err := New(badClient, 10, 1.0)
 	if err != nil {
